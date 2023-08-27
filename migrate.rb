@@ -175,7 +175,7 @@ end
       all_playlists = apple_music_get_library_entities('playlists')
       log.info("Found #{all_playlists.length} existing playlists to remove from library: #{all_playlists}")
       Parallel.each(all_playlists, in_threads: self.parallel_requests, progress: "Removing playlists from library") do |i|
-        apple_music_remove_entity_from_library(i["id"], "all_playlists")
+        apple_music_remove_entity_from_library(i["id"], "playlists")
         log.info("Playlist #{i['id']} removed from library!")
       end
     end

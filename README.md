@@ -14,7 +14,23 @@ Git clone this repository.
 - **Using a container:** `docker run --rm -it -v ./:/workdir ruby cd /workdir && gem install bundler && bundle install && ruby migrate.rb --help`
 - **Using Ruby:** `gem install bundler && bundle install && ruby migrate.rb --help`
 
-- `bundle install`
+### How to get Tidal and Apple Music Tokens?
+
+#### Apple Music
+
+1. Open a new tab in browser
+2. Open the developer tools (Ctrl-Shift-I) and select the “Network” tab
+3. Go to [https://music.apple.com](https://music.apple.com) and ensure you are logged in
+4. Find any authenticated POST request.
+5. Copy out the value of the `authorization header` without " bearer" and `media-user-token` request headers
+
+#### Tidal
+
+1. Open a new tab in browser
+2. Open the developer tools (Ctrl-Shift-I) and select the “Network” tab
+3. Go to [https://listen.tidal.com](https://listen.tidal.com) and ensure you are logged in
+4. Find any authenticated POST request.
+5. Copy out the value of the `authorization header` without "bearer " request headers
 
 ## Help
 
