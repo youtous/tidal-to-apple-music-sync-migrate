@@ -238,12 +238,13 @@ end
     log.info("All songs in playlist '#{apple_playlist["attributes"]["name"]}': #{hash_apple_music_playlist_songs}")
 
     Parallel.each(items,in_threads: self.parallel_requests, progress: "Adding items to Apple Music") do |item|
-      log.info("Searching Tidal item on Apple Music : #{item} - #{item["item"]["title"]} #{item["item"]["album"]["title"]}")
-      if item_type == "videos"
-        searched_item = apple_music_search_catalog(term: "#{item["item"]["title"]}", country_code: self.apple_music_search_country_code)
-      else
-        searched_item = apple_music_search_catalog(term: "#{item["item"]["title"]} #{item["item"]["album"]["title"]}", country_code: self.apple_music_search_country_code)
+
+      term =  "#{item["item"]["title"]}"
+      if item["item"]["album"] and item["item"]["album"]["title"]
+        term += " #{item["item"]["album"]["title"]}"
       end
+      log.info("Searching Tidal item on Apple Music : #{item} - #{term}")
+      searched_item = apple_music_search_catalog(term: term, country_code: self.apple_music_search_country_code)
 
       # add the song
       if searched_item["results"].empty? or searched_item["results"]["songs"].empty?
