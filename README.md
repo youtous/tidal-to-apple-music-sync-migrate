@@ -1,4 +1,4 @@
-# Tidal To Apple Music Migrate and Sync
+# 🎶 Tidal To Apple Music Migrate and Sync
 
 Easily migrate or sync your playlists and favorites from Tidal to Apple Music.
 
