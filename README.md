@@ -16,7 +16,7 @@ Easily migrate or sync your playlists and favorites from Tidal to Apple Music.
 
 Git clone this repository.
 
-- **Using a container:** `docker run --rm -it -v ./:/workdir ruby cd /workdir && gem install bundler && bundle install && ruby migrate.rb --help`
+- **Using a container:** `docker run --rm -it -v ./:/workdir ruby sh -c 'cd /workdir && gem install bundler && bundle install && ruby migrate.rb --help'`
 - **Using Ruby:** `gem install bundler && bundle install && ruby migrate.rb --help`
 
 ### How to get Tidal and Apple Music Tokens?

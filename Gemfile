@@ -6,6 +6,7 @@ source 'https://rubygems.org'
 
 gem 'clamp'
 gem 'parallel'
+gem 'ruby-progressbar'
 
 gem 'httparty'
 
