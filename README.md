@@ -1,11 +1,8 @@
 # 🎶 Tidal To Apple Music Migrate and Sync
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/youtous/tidal-to-apple-music-sync-migrate?label=✨%20youtous%2Ftidal-to-apple-music-sync-migrate&style=social)](https://github.com/youtous/tidal-to-apple-music-sync-migrate/)
-
 [![Gitlab Repo](https://img.shields.io/badge/gitlab.com%2Fyoutous%2Fsmart--door--opener?label=✨%20youtous%2Ftidal-to-apple-music-sync-migrate&style=social&logo=gitlab)](https://gitlab.com/youtous/tidal-to-apple-music-sync-migrate/)
-
 [![Licence](https://img.shields.io/github/license/youtous/tidal-to-apple-music-sync-migrate)](https://github.com/youtous/tidal-to-apple-music-sync-migrate/blob/main/LICENSE)
-
 
 
 Easily migrate or sync your playlists and favorites from Tidal to Apple Music.
