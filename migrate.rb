@@ -4,6 +4,35 @@ require 'parallel'
 require 'httparty'
 require 'jwt'
 
+# Rate limiting configuration
+TIDAL_SECONDS_BETWEEN_REQUESTS = 1.0  # Wait 1 second between Tidal API requests
+APPLE_MUSIC_SECONDS_BETWEEN_REQUESTS = 10.0  # Wait 10 seconds between Apple Music API requests
+
+class FixedIntervalLimiter
+  def initialize(seconds_between_requests)
+    @interval = seconds_between_requests
+    @last_request = nil
+    @mutex = Mutex.new
+  end
+
+  def wait_if_needed
+    @mutex.synchronize do
+      now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      
+      if @last_request
+        elapsed = now - @last_request
+        if elapsed < @interval
+          sleep_time = @interval - elapsed
+          return sleep_time
+        end
+      end
+
+      @last_request = now
+      0
+    end
+  end
+end
+
 Clamp do
   option '--log_level', 'LOG_LEVEL', 'log level', environment_variable: 'LOG_LEVEL', default: 'INFO'
 
@@ -183,8 +212,26 @@ end
 
   def init
     @log = Logger.new($stdout, level: log_level)
+    @tidal_limiter = FixedIntervalLimiter.new(TIDAL_SECONDS_BETWEEN_REQUESTS)
+    @apple_music_limiter = FixedIntervalLimiter.new(APPLE_MUSIC_SECONDS_BETWEEN_REQUESTS)
     tidal_auth
     apple_music_auth
+  end
+
+  def handle_tidal_rate_limit
+    wait_time = @tidal_limiter.wait_if_needed
+    if wait_time > 0
+      log.debug("Rate limiting: Waiting #{wait_time.round(3)}s between Tidal API requests")
+      sleep(wait_time)
+    end
+  end
+
+  def handle_apple_rate_limit
+    wait_time = @apple_music_limiter.wait_if_needed
+    if wait_time > 0
+      log.debug("Rate limiting: Waiting #{wait_time.round(3)}s between Apple Music API requests")
+      sleep(wait_time)
+    end
   end
 
   def add_tidal_artists_to_apple_favorites(items:, like: true)
@@ -283,11 +330,13 @@ end
       params = { limit: step, offset: offset, order: 'DATE', orderDirection: 'DESC',
                  countryCode: tidal_country_code }
       url = "#{self.tidal_api_url}/v1/users/#{self.tidal_user['uid']}/favorites/#{entity}"
+      handle_tidal_rate_limit
       log.info("GET #{url} - #{params}")
       tidal_response = HTTParty
                          .get(url,
                               query: params,
                               headers: { 'Authorization' => "Bearer #{tidal_bearer_token}" })
+      log.debug("Tidal response code: #{tidal_response.code}")
 
       unless tidal_response.success?
         err = "An error occurred with the request: #{tidal_response.request.last_uri} (http_code=#{tidal_response.code}) #{tidal_response}"
@@ -311,11 +360,13 @@ end
       params = { limit: step, offset: offset, order: 'DATE', orderDirection: 'DESC',
                  countryCode: tidal_country_code }
       url = "#{self.tidal_api_url}/v1/#{entity}/#{id}/items"
+      handle_tidal_rate_limit
       log.info("GET #{url} - #{params}")
       tidal_response = HTTParty
                          .get(url,
                               query: params,
                               headers: { 'Authorization' => "Bearer #{tidal_bearer_token}" })
+      log.debug("Tidal response code: #{tidal_response.code}")
 
       unless tidal_response.success?
         err = "An error occurred with the request: #{tidal_response.request.last_uri} (http_code=#{tidal_response.code}) #{tidal_response}"
@@ -339,11 +390,13 @@ end
       params = { limit: step, cursor: cursor, order: 'DATE', orderDirection: 'DESC',
                  countryCode: tidal_country_code, includeOnly: "PLAYLIST" }
       url = "#{self.tidal_api_listen_url}/v2/my-collection/playlists/folders/flattened"
+      handle_tidal_rate_limit
       log.info("GET #{url} - #{params}")
       tidal_response = HTTParty
                          .get(url,
                               query: params,
                               headers: { 'Authorization' => "Bearer #{tidal_bearer_token}" })
+      log.debug("Tidal response code: #{tidal_response.code}")
 
       unless tidal_response.success?
         err = "An error occurred with the request: #{tidal_response.request.last_uri} (http_code=#{tidal_response.code}) #{tidal_response}"
@@ -371,11 +424,13 @@ end
     end
 
     query = {"ids[#{entity}]" => ids}
+    handle_apple_rate_limit
     log.info("POST #{url} - #{query}")
     apple_response = HTTParty
                        .post(url,
                              query: query,
                              headers: self.apple_music_headers)
+    log.debug("Apple Music response code: #{apple_response.code}")
 
     unless apple_response.success?
       err = "An error occurred with the request: #{apple_response.request.last_uri} (http_code=#{apple_response.code}) #{apple_response}"
@@ -388,10 +443,12 @@ end
 
   def apple_music_remove_entity_from_library(id, entity = 'songs')
     url = "#{self.apple_music_api_url}/v1/me/library/#{entity}/#{id}"
+    handle_apple_rate_limit
     log.info("DELETE #{url}")
     apple_response = HTTParty
                        .delete(url,
                                headers: self.apple_music_headers)
+    log.debug("Apple Music response code: #{apple_response.code}")
 
     unless apple_response.success?
       err = "An error occurred with the request: #{apple_response.request.last_uri} (http_code=#{apple_response.code}) #{apple_response}"
@@ -412,18 +469,22 @@ end
     query = {}
     body = {type: "rating", attributes: {value: like ? 1 : -1}}
     if like
+      handle_apple_rate_limit
       log.info("PUT #{url} - #{query} - #{body}")
       apple_response = HTTParty
                          .put(url,
                               body: body.to_json,
                               query: query,
                               headers: self.apple_music_headers)
+      log.debug("Apple Music response code: #{apple_response.code}")
     else
       # remove the rating, instead of unlinking
+      handle_apple_rate_limit
       log.info("DELETE #{url} - #{query}")
       apple_response = HTTParty
                          .delete(url,
                                  headers:self.apple_music_headers)
+      log.debug("Apple Music response code: #{apple_response.code}")
     end
 
 
@@ -438,10 +499,12 @@ end
 
   def apple_music_delete_library_entity(id, entity = 'songs')
     url = "#{self.apple_music_api_url}/v1/me/library/#{entity}/#{id}"
+    handle_apple_rate_limit
     log.info("DELETE #{url}")
     apple_response = HTTParty
                        .delete(url,
                                headers: self.apple_music_headers)
+    log.debug("Apple Music response code: #{apple_response.code}")
 
     unless apple_response.success?
       err = "An error occurred with the request: #{apple_response.request.last_uri} (http_code=#{apple_response.code}) #{apple_response}"
@@ -454,10 +517,12 @@ end
 
   def apple_music_get_library_entity(id, entity = 'songs')
     url = "#{self.apple_music_api_url}/v1/me/library/#{entity}/#{id}"
+    handle_apple_rate_limit
     log.info("GET #{url}")
     apple_response = HTTParty
                        .get(url,
                             headers: self.apple_music_headers)
+    log.debug("Apple Music response code: #{apple_response.code}")
 
     unless apple_response.success?
       err = "An error occurred with the request: #{apple_response.request.last_uri} (http_code=#{apple_response.code}) #{apple_response}"
@@ -471,11 +536,13 @@ end
   def apple_music_search_catalog(term:, country_code:, limit: 1, types: ['songs'])
     params = {limit: limit, term: term, types: types.join(', ') }
     url = "#{self.apple_music_api_url}/v1/catalog/#{country_code}/search"
+    handle_apple_rate_limit
     log.info("GET #{url} - #{params}")
     apple_response = HTTParty
                        .get(url,
                             query: params,
                             headers: self.apple_music_headers)
+    log.debug("Apple Music response code: #{apple_response.code}")
 
     unless apple_response.success?
       err = "An error occurred with the request: #{apple_response.request.last_uri} (http_code=#{apple_response.code}) #{apple_response}"
@@ -499,11 +566,13 @@ end
     loop do
       params = {offset: offset, limit: step}
       url = "#{self.apple_music_api_url}/v1/me/library/playlists/#{id}/tracks"
+      handle_apple_rate_limit
       log.info("GET #{url} - #{params}")
       apple_response = HTTParty
                          .get(url,
                               query: params,
                               headers: self.apple_music_headers)
+      log.debug("Apple Music response code: #{apple_response.code}")
 
       unless apple_response.success?
         if apple_response.code == 404
@@ -531,11 +600,13 @@ end
     loop do
       params = {limit: step, offset: offset}
       url = "#{self.apple_music_api_url}/v1/me/library/#{entity}"
+      handle_apple_rate_limit
       log.info("GET #{url} - #{params}")
       apple_response = HTTParty
                          .get(url,
                               query: params,
                               headers: self.apple_music_headers)
+      log.debug("Apple Music response code: #{apple_response.code}")
 
       unless apple_response.success?
         err = "An error occurred with the request: #{apple_response.request.last_uri} (http_code=#{apple_response.code}) #{apple_response}"
@@ -554,6 +625,7 @@ end
   def apple_music_post_library_entity(entity = 'songs', attributes = {})
     params = {}
     url = "#{self.apple_music_api_url}/v1/me/library/#{entity}"
+    handle_apple_rate_limit
     log.info("POST #{url} - #{params} : #{attributes}")
     apple_response = HTTParty
                        .post(url,
@@ -561,6 +633,7 @@ end
                              headers: self.apple_music_headers,
                              body: {attributes: attributes}.to_json
                        )
+    log.debug("Apple Music response code: #{apple_response.code}")
 
     unless apple_response.success?
       err = "An error occurred with the request: #{apple_response.request.last_uri} (http_code=#{apple_response.code}) #{apple_response}"
@@ -575,6 +648,7 @@ end
     params = {}
     url = "#{self.apple_music_api_url}/v1/me/library/playlists/#{playlist_id}/tracks"
     body = {data: [{id: item_id, type: item_type}]}
+    handle_apple_rate_limit
     log.info("POST #{url} - #{params} : #{body}")
     apple_response = HTTParty
                        .post(url,
@@ -582,6 +656,7 @@ end
                              headers: self.apple_music_headers,
                              body: body.to_json
                        )
+    log.debug("Apple Music response code: #{apple_response.code}")
 
     unless apple_response.success?
       err = "An error occurred with the request: #{apple_response.request.last_uri} (http_code=#{apple_response.code}) #{apple_response}"
