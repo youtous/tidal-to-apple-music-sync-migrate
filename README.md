@@ -1,3 +1,5 @@
+
+
 # 🎶 Tidal To Apple Music Migrate and Sync
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/youtous/tidal-to-apple-music-sync-migrate?label=✨%20youtous%2Ftidal-to-apple-music-sync-migrate&style=social)](https://github.com/youtous/tidal-to-apple-music-sync-migrate/)
@@ -27,7 +29,7 @@ Git clone this repository.
 2. Open the developer tools (Ctrl-Shift-I) and select the “Network” tab
 3. Go to [https://music.apple.com](https://music.apple.com) and ensure you are logged in
 4. Find any authenticated POST request.
-5. Copy out the value of the `authorization header` without " bearer" and `media-user-token` request headers
+5. Copy out the value of the `Authorization` header (removing `Bearer `) and the `Media-User-Token` header.
 
 #### Tidal
 
